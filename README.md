@@ -52,7 +52,8 @@ claude.ai → 설정 → 커넥터 → SciSpace 연결. PubMed, alphaXiv, bioRxi
 ```bash
 P="python ~/.claude/skills/paper-summary/scripts/paperlib.py"
 $P add <DOI | arXiv ID/URL | PDF 경로 | PDF URL> [--no-pdf]   # 등록(+본문·그림 추출)
-$P list                                                         # 목록
+$P add <받은 PDF 경로> [--key <citekey>]                         # 유료 논문: 나중에 받은 PDF를 기존 항목에 붙이기
+$P list [--pending]                                             # 목록 (--pending: PDF 대기만)
 $P search HRV ECG                                               # 제목·초록·요약·본문 검색
 $P show Pstras2026estimating                                    # 서지·파일 보기
 $P cite 원고.md --style apa|ieee [--table] [-o 결과.md]          # [@키] → 본문 인용 + 참고문헌
@@ -82,7 +83,7 @@ paper-library/
 ## 유의
 
 - 라이브러리(PDF·본문·그림)는 이 저장소에 포함되지 않습니다. 저작권 문제가 있으니 공개 저장소에 올리지 마세요.
-- 유료 논문은 공개 PDF가 없으면 서지만 등록됩니다. 직접 받은 PDF의 경로로 다시 `add` 하면 본문과 그림을 추출합니다.
+- 유료 논문은 공개 PDF가 없으면 서지·초록만 등록되고 목록에 `PDF대기`로 표시됩니다. 직접 받은 PDF로 `add <PDF 경로>` 하면 DOI나 제목으로 같은 항목을 찾아 본문과 그림을 채웁니다. 제목을 못 읽는 스캔본은 `--key <citekey>`로 지정하세요.
 - 그림 추출은 「Figure N:」「Fig. N」 캡션을 기준으로 합니다. 레이아웃이 특이한 PDF에서는 일부 그림을 놓치거나 범위가 어긋날 수 있습니다.
 - 한글(hwpx) 문서로 내보내려면 별도의 `hwpx-template` 스킬이 필요합니다.
 

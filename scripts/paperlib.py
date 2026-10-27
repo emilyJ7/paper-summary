@@ -10,8 +10,8 @@
 라이브러리 루트에는 library.json(목록)과 library.bib(BibTeX)를 자동으로 다시 만든다.
 
 사용:
-  python paperlib.py add <DOI | arXiv ID/URL | PDF 경로 | PDF URL> [--no-pdf]
-  python paperlib.py list | search <단어...> | show <citekey>
+  python paperlib.py add <DOI | arXiv ID/URL | PDF 경로 | PDF URL> [--no-pdf] [--key <citekey>]
+  python paperlib.py list [--pending] | search <단어...> | show <citekey>
   python paperlib.py cite <원고.md> [-o 결과.md] [--style apa|ieee] [--table] [--heading 참고문헌]
   python paperlib.py render [citekey]      summary.md → index.html (라이브러리 목록 index.html 포함)
   python paperlib.py rebuild
@@ -225,10 +225,14 @@ def make_key(meta):
 
 
 def find_existing(meta):
-    for mj in PAPERS.glob("*/meta.json"):
-        m = json.loads(mj.read_text(encoding="utf-8"))
+    """DOI·arXiv가 같거나, 없으면 제목이 같은 기존 항목의 citekey."""
+    metas = [json.loads(mj.read_text(encoding="utf-8")) for mj in PAPERS.glob("*/meta.json")]
+    for m in metas:
         if (meta.get("doi") and m.get("doi") == meta["doi"]) or (meta.get("arxiv") and m.get("arxiv") == meta["arxiv"]):
-            return mj.parent.name
+            return m["key"]
+    for m in metas:
+        if same_title(m.get("title"), meta.get("title")):
+            return m["key"]
     return None
 
 
@@ -307,6 +311,7 @@ def rebuild():
     idx = [{k: m.get(k) for k in ("key", "title", "year", "venue", "doi", "arxiv", "added")} |
            {"authors": "; ".join(a["family"] for a in m.get("authors", [])),
             "has_summary": (PAPERS / m["key"] / "summary.md").exists(),
+            "has_text": (PAPERS / m["key"] / "text.md").exists(),
             "figures": len(json.loads((PAPERS / m["key"] / "figures.json").read_text(encoding="utf-8")))
             if (PAPERS / m["key"] / "figures.json").exists() else 0} for m in metas]
     (LIB / "library.json").write_text(json.dumps(idx, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -322,13 +327,31 @@ def load_meta(key):
 # ---------------------------------------------------------------- 명령
 def cmd_add(a):
     PAPERS.mkdir(parents=True, exist_ok=True)
-    meta, local_pdf = resolve(a.source)
-    key = find_existing(meta) or make_key(meta)
+    note = ""
+    if a.key:  # 서지만 등록된 항목에 PDF를 직접 붙이기
+        old = load_meta(a.key) or sys.exit(f"없는 citekey: {a.key}")
+        src = Path(a.source)
+        if not src.exists():
+            if not a.source.lower().startswith("http"):
+                sys.exit(f"PDF 파일이 없음: {a.source}")
+            src = LIB / "_download.pdf"
+            download(a.source, src)
+        meta, local_pdf, key = old, src, a.key
+    else:
+        meta, local_pdf = resolve(a.source)
+        key = find_existing(meta)
+        if key:  # 기존 서지(출판사·Crossref)를 우선하고 빈 칸만 새 값으로 채움
+            old = load_meta(key)
+            meta = {**meta, **{k: v for k, v in old.items() if v}}
+        else:
+            key = make_key(meta)
+            if local_pdf and meta.get("source") == "pdf":
+                note = ("서지 정보를 찾지 못해 PDF 제목으로만 등록함. 이미 등록한 논문의 PDF라면 "
+                        "이 폴더를 지우고 --key <citekey>로 다시 추가")
     d = PAPERS / key
     d.mkdir(exist_ok=True)
     meta.update(key=key, added=meta.get("added") or datetime.date.today().isoformat())
     pdf = d / "paper.pdf"
-    note = ""
     if local_pdf:
         if Path(local_pdf).resolve() != pdf.resolve():
             shutil.copyfile(local_pdf, pdf)
@@ -338,9 +361,11 @@ def cmd_add(a):
         try:
             download(meta["pdf_url"], pdf)
         except Exception as e:
-            note = f"PDF 내려받기 실패: {e}"
-    elif not pdf.exists():
-        note = "공개 PDF 없음 — PDF 파일 경로로 다시 add 하면 본문·그림을 추출함"
+            note = (f"PDF 내려받기 실패({e}) — 서지·초록만 저장. PDF를 받으면 "
+                    f"'add <PDF 경로>' 또는 'add <PDF 경로> --key {key}'로 본문·그림 추출")
+    elif not pdf.exists() and not (d / "text.md").exists():
+        note = (f"공개 PDF 없음(유료일 수 있음) — 서지·초록만 저장. PDF를 받으면 "
+                f"'add <PDF 경로>' 또는 'add <PDF 경로> --key {key}'로 본문·그림 추출")
     figs = []
     if pdf.exists():
         doc = fitz.open(pdf)
@@ -361,8 +386,12 @@ def cmd_add(a):
 
 
 def cmd_list(a):
-    for r in json.loads((LIB / "library.json").read_text(encoding="utf-8")) if (LIB / "library.json").exists() else []:
-        print(f"{r['key']:32} {r['year'] or '':5} {'요약O' if r['has_summary'] else '요약X'} 그림{r['figures']:<2} {r['title'][:70]}")
+    rows = json.loads((LIB / "library.json").read_text(encoding="utf-8")) if PAPERS.exists() and rebuild() is not None else []
+    if a.pending:
+        rows = [r for r in rows if not r.get("has_text")]
+    for r in rows:
+        body = "본문O " if r.get("has_text") else "PDF대기"
+        print(f"{r['key']:32} {r['year'] or '':5} {body} {'요약O' if r['has_summary'] else '요약X'} 그림{r['figures']:<2} {r['title'][:60]}")
 
 
 def cmd_search(a):
@@ -521,8 +550,9 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sp = ap.add_subparsers(dest="cmd", required=True)
-    p = sp.add_parser("add"); p.add_argument("source"); p.add_argument("--no-pdf", action="store_true"); p.set_defaults(f=cmd_add)
-    sp.add_parser("list").set_defaults(f=cmd_list)
+    p = sp.add_parser("add"); p.add_argument("source"); p.add_argument("--no-pdf", action="store_true")
+    p.add_argument("--key", help="이미 등록된 citekey에 이 PDF를 붙임"); p.set_defaults(f=cmd_add)
+    p = sp.add_parser("list"); p.add_argument("--pending", action="store_true", help="PDF 대기(본문 없음)만"); p.set_defaults(f=cmd_list)
     p = sp.add_parser("search"); p.add_argument("terms", nargs="+"); p.set_defaults(f=cmd_search)
     p = sp.add_parser("show"); p.add_argument("key"); p.set_defaults(f=cmd_show)
     p = sp.add_parser("cite"); p.add_argument("draft"); p.add_argument("-o", "--output")

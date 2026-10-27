@@ -28,7 +28,9 @@ paper-library/
 
 1. `add <입력>` — 입력은 DOI, arXiv ID·URL, 로컬 PDF 경로, PDF URL 중 하나.
    - 서지는 Crossref(DOI), arXiv API, OpenAlex(공개 PDF 위치)에서 받는다. 모두 무료이고 키가 필요 없다. PDF만 있으면 첫 2쪽에서 DOI·arXiv ID를 찾고, 없으면 제목으로 Crossref를 검색한다.
-   - 공개 PDF가 있으면 내려받아 `text.md`(쪽 표시 포함)와 `figures/`(Figure N 캡션 위 그래픽을 잘라 JPG로)를 만든다. 유료 논문은 "공개 PDF 없음"이라고 나오니, 사용자에게 PDF 파일을 받아 경로로 다시 add 하라고 안내한다.
+   - 공개 PDF가 있으면 내려받아 `text.md`(쪽 표시 포함)와 `figures/`(Figure N 캡션 위 그래픽을 잘라 JPG로)를 만든다.
+   - **유료 논문**은 서지·초록만 저장되고 `list`에 `PDF대기`로 표시된다(`list --pending`으로 모아 보기). 이때 초록 기반의 임시 요약만 쓰고 "PDF를 받으면 본문 기준으로 다시 정리함"이라고 적는다. 사용자에게 PDF를 받아 달라고 안내한다.
+   - **PDF를 받으면** `add <PDF 경로>`를 실행한다. PDF의 DOI·arXiv 번호, 없으면 제목으로 기존 항목을 찾아 같은 폴더에 본문·그림을 채우고, 기존 서지(Crossref 등)는 유지한다. 제목도 못 읽는 PDF(스캔본 등)는 `add <PDF 경로> --key <citekey>`로 직접 붙인다. 그다음 summary.md를 본문 기준으로 다시 쓴다(쪽 번호 인용 포함).
    - 같은 DOI·arXiv는 같은 폴더를 갱신한다. citekey는 `제1저자성+연도+제목첫단어` 형식이다(예: `Pstras2026estimating`).
    - **디스크가 빠듯하면** `--no-pdf`로 추출 후 PDF를 지운다.
 2. **그림 확인**: `figures.json`의 그림을 Read로 몇 장 열어 잘림이나 엉뚱한 영역이 없는지 본다. 잘못된 그림은 요약에 넣지 않는다.

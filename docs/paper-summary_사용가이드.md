@@ -76,8 +76,15 @@ Claude가 하는 일:
 
 유의할 점:
 
-- 유료 논문은 공개 PDF가 없으면 서지 정보만 등록됩니다. 직접 받은 PDF의 경로를 주면 본문과 그림을 추출합니다.
 - 디스크가 부족하면 "PDF는 지워줘"라고 하세요. `--no-pdf` 옵션으로 추출만 하고 PDF는 남기지 않습니다.
+
+### 유료 논문 (초록만 있는 경우)
+
+1. DOI로 추가하면 서지와 초록만 저장되고, 목록에 `PDF대기`로 표시됩니다. 요약은 초록 기준의 임시 요약입니다.
+2. 도서관이나 출판사에서 PDF를 받은 뒤 `이 PDF로 정리해줘: C:\Downloads\paper.pdf`라고 말합니다.
+3. Claude가 PDF의 DOI나 제목으로 같은 항목을 찾아 본문과 그림을 채우고, 요약을 본문 기준(쪽 번호 인용 포함)으로 다시 씁니다. 기존 서지 정보는 그대로 유지됩니다.
+4. 스캔본처럼 제목을 읽을 수 없는 PDF는 citekey를 함께 알려 주세요. 예: `이 PDF를 Mohamad2026physqual에 붙여줘`
+5. PDF를 기다리는 논문은 "PDF 대기 목록 보여줘"로 모아 볼 수 있습니다.
 
 ## 5. 사용법 ③ — 글쓰기와 자동 인용
 
@@ -109,7 +116,8 @@ Claude가 하는 일:
 | 명령 | 설명 |
 |---|---|
 | `paperlib.py add <입력> [--no-pdf]` | 논문 등록, 본문·그림 추출 |
-| `paperlib.py list` | 라이브러리 목록 |
+| `paperlib.py add <PDF 경로> [--key <citekey>]` | 유료 논문에 나중에 받은 PDF 붙이기 |
+| `paperlib.py list [--pending]` | 라이브러리 목록 (`--pending`: PDF 대기만) |
 | `paperlib.py search <단어...>` | 제목·초록·요약·본문 검색 |
 | `paperlib.py show <citekey>` | 서지 정보와 파일 목록 |
 | `paperlib.py cite <원고.md> [--style apa\|ieee] [--table] [-o 결과.md]` | 인용 키를 본문 인용으로 바꾸고 참고문헌 생성 |
