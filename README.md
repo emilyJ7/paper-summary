@@ -12,6 +12,13 @@ Claude Code에서 논문을 찾고 요약해 **로컬 논문 라이브러리**�
 
 필요한 것: [Claude Code](https://claude.com/claude-code), Python 3.9 이상, git
 
+**가장 쉬운 방법 — Claude에게 맡기기.** Claude Code에서 이렇게 말하면 아래 명령을 대신 실행합니다.
+```text
+https://github.com/emilyJ7/paper-summary 스킬을 ~/.claude/skills/paper-summary에 설치하고 필요한 파이썬 패키지도 설치해줘
+```
+
+직접 설치하려면:
+
 **Windows (PowerShell)**
 ```powershell
 git clone https://github.com/emilyJ7/paper-summary.git "$HOME\.claude\skills\paper-summary"
@@ -25,13 +32,23 @@ python3 -m pip install -r ~/.claude/skills/paper-summary/requirements.txt
 ```
 
 설치 확인(논문 한 편을 시험 등록):
+```powershell
+# Windows (PowerShell)
+python "$HOME\.claude\skills\paper-summary\scripts\paperlib.py" add 2510.27028
+```
 ```bash
-python ~/.claude/skills/paper-summary/scripts/paperlib.py add 2510.27028
+# macOS / Linux
+python3 ~/.claude/skills/paper-summary/scripts/paperlib.py add 2510.27028
 ```
 `~/paper-library/papers/Rouast2025vitallens/`에 `meta.json`, `text.md`, `figures/`가 생기면 성공입니다. Claude Code를 다시 시작하면 스킬 목록에 `paper-summary`가 보입니다.
 
-업데이트:
+업데이트 (또는 Claude에게 "paper-summary 스킬 최신 버전으로 업데이트해줘"):
+```powershell
+# Windows (PowerShell)
+git -C "$HOME\.claude\skills\paper-summary" pull
+```
 ```bash
+# macOS / Linux
 git -C ~/.claude/skills/paper-summary pull
 ```
 

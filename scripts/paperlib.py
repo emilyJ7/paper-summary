@@ -30,7 +30,10 @@ import unicodedata
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import fitz  # PyMuPDF
+try:
+    import pymupdf as fitz  # PyMuPDF 1.24+
+except ImportError:
+    import fitz  # 이전 버전 PyMuPDF
 import requests
 
 LIB = Path(os.environ.get("PAPER_LIB", Path.home() / "paper-library"))

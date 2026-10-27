@@ -191,4 +191,4 @@ SDNN 정확도 다룬 논문 인용 키 알려줘
 | `paperlib.py cite <원고.md> [--style apa\|ieee] [--table]` | 인용 키 → 본문 인용 + 참고문헌 |
 | `paperlib.py render [키]` | 요약 노트 → HTML |
 
-실행 위치: `python ~/.claude/skills/paper-summary/scripts/paperlib.py <명령>`
+실행 위치: Windows PowerShell은 `python "$HOME\.claude\skills\paper-summary\scripts\paperlib.py" <명령>`, macOS·Linux는 `python3 ~/.claude/skills/paper-summary/scripts/paperlib.py <명령>`
