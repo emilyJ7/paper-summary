@@ -446,7 +446,16 @@ def ref_apa(m):
 
 def ref_ieee(m):
     au = [f"{initials(a['given'])} {a['family']}".strip() for a in m.get("authors", [])]
-    au_s = au[0] if len(au) == 1 else ", ".join(au[:-1]) + ", and " + au[-1] if len(au) <= 6 else au[0] + " et al." if au else ""
+    if not au:
+        au_s = ""
+    elif len(au) == 1:
+        au_s = au[0]
+    elif len(au) == 2:
+        au_s = f"{au[0]} and {au[1]}"
+    elif len(au) <= 6:
+        au_s = ", ".join(au[:-1]) + ", and " + au[-1]
+    else:
+        au_s = au[0] + " et al."
     vol = f", vol. {m['volume']}" if m.get("volume") else ""
     no = f", no. {m['issue']}" if m.get("issue") else ""
     pp = (f", pp. {m['pages']}" if "-" in str(m["pages"]) else f", Art. no. {m['pages']}") if m.get("pages") else ""
@@ -486,7 +495,11 @@ def cmd_cite(a):
                 bits.append(f"{order.index(key) + 1}" + (f", {loc}" if loc else ""))
             else:
                 bits.append(f"{names_short(m)}, {m.get('year') or 'n.d.'}" + (f", {loc}" if loc else ""))
-        return f"[{', '.join(bits)}]" if a.style == "ieee" else f"({'; '.join(bits)})"
+        if a.style != "ieee":
+            return f"({'; '.join(bits)})"
+        if any(", " in b for b in bits):  # 쪽 번호가 있으면 [2, p. 7], [3]처럼 따로 묶음
+            return ", ".join(f"[{b}]" for b in bits)
+        return f"[{', '.join(bits)}]"
 
     body = CITE_RE.sub(repl, text)
     metas = {k: load_meta(k) for k in order}
