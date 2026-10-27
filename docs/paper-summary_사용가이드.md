@@ -1,165 +1,194 @@
-# paper-summary 사용 가이드
+# paper-summary 사용 가이드 — Claude에게 이렇게 말하세요
 
-Claude Code에서 논문을 찾고, 요약을 로컬 라이브러리에 쌓아 두었다가, 글을 쓸 때 인용하면 참고문헌이 자동으로 달리게 하는 스킬입니다.
+Claude Code에서 자연어로 말하기만 하면, 논문을 찾고 요약해 쌓아 두었다가 글을 쓸 때 참고문헌까지 자동으로 달아 주는 스킬입니다. 명령어를 외울 필요가 없습니다.
 
 - 저장소: https://github.com/emilyJ7/paper-summary
-- 비용: Zotero와 LLM API 키가 필요 없습니다. 서지 정보는 무료 공개 API(Crossref, arXiv, OpenAlex)에서 가져오고, 요약은 Claude Code 대화 안에서 Claude가 직접 씁니다.
+- 비용: Zotero와 LLM API 키가 필요 없습니다. 서지 정보는 무료 공개 API에서 가져오고, 요약은 Claude가 대화 안에서 직접 씁니다.
 
 ## 1. 한눈에 보기
 
-| 단계 | 하는 일 | Claude에게 이렇게 말하기 |
-|---|---|---|
-| ① 조사 | 주제로 논문 검색·선별·종합 | `/paper-summary rPPG 기반 HRV 추정 연구 정리해줘` |
-| ② 저장 | 논문 한 편의 서지·본문·그림 저장 + 요약 노트 | `이 논문 라이브러리에 추가하고 요약해줘: 10.1038/s41598-026-70292-0` |
-| ③ 집필 | 라이브러리 내용으로 글을 쓰고 참고문헌 자동 생성 | `라이브러리의 HRV 논문들로 서론 써주고 참고문헌 APA로 달아줘` |
+| 하고 싶은 일 | Claude에게 이렇게 말하기 |
+|---|---|
+| 주제로 논문 조사 | `/paper-summary rPPG 기반 HRV 추정 연구 정리해줘` |
+| 논문 한 편 저장·요약 | `이 논문 라이브러리에 추가하고 요약해줘: 10.1038/s41598-026-70292-0` |
+| 가진 PDF 정리 | `C:\Downloads\paper.pdf 논문 요약해줘` |
+| 저장한 논문 찾기 | `라이브러리에서 HRV 관련 논문 찾아줘` |
+| 글쓰기 + 인용 | `라이브러리의 HRV 논문들로 연구 배경 써주고 참고문헌 APA로 달아줘` |
+| 내 원고에 참고문헌 | `draft.md 참고문헌 IEEE로 달아줘` |
 
-## 2. 설치
+> 팁: 처음에 `/paper-summary`를 붙이면 이 스킬을 확실히 씁니다. 붙이지 않아도 "논문 요약", "참고문헌" 같은 말이 있으면 Claude가 알아서 이 스킬을 고릅니다.
 
-필요한 것: Claude Code, Python 3.9 이상, git
+## 2. 설치 (처음 한 번)
 
-### Windows (PowerShell)
-
-```powershell
-git clone https://github.com/emilyJ7/paper-summary.git "$HOME\.claude\skills\paper-summary"
-python -m pip install -r "$HOME\.claude\skills\paper-summary\requirements.txt"
-```
-
-### macOS / Linux
-
-```bash
-git clone https://github.com/emilyJ7/paper-summary.git ~/.claude/skills/paper-summary
-python3 -m pip install -r ~/.claude/skills/paper-summary/requirements.txt
-```
-
-### 설치 확인
-
-```bash
-python ~/.claude/skills/paper-summary/scripts/paperlib.py add 2510.27028
-```
-
-- `~/paper-library/papers/Rouast2025vitallens/` 폴더가 생기면 성공입니다.
-- Claude Code를 다시 시작하면 스킬 목록에 `paper-summary`가 보입니다.
-
-### (선택) SciSpace 검색 연결
-
-- 주제 검색(①)에는 claude.ai의 SciSpace 커넥터를 씁니다. claude.ai → 설정 → 커넥터에서 각자 자기 계정에 연결하세요.
-- PubMed, alphaXiv, bioRxiv 커넥터도 연결하면 검색 범위가 넓어집니다.
-- 커넥터가 없어도 DOI·arXiv 번호·PDF로 논문을 추가하는 ②와 집필하는 ③은 그대로 쓸 수 있습니다.
-
-## 3. 사용법 ① — 주제로 문헌 조사
-
-1. `/paper-summary <주제>`로 요청합니다. 기간, 대상, 논문 수 같은 조건이 있으면 함께 말합니다.
-2. Claude가 주제를 영어 검색 질문으로 바꿔 SciSpace에서 찾고, 5~10편을 고릅니다.
-3. 필요하면 의학은 PubMed, 공학은 alphaXiv로 보강 검색을 합니다.
-4. 결과는 핵심 요약, 비교표, 논문별 메모, 연구 공백, 참고문헌 순서로 정리됩니다.
-5. "라이브러리에도 등록해줘"라고 하면 고른 논문을 ② 방식으로 저장합니다.
-
-> 팁: 결과를 한글(hwpx)로 받으려면 `hwpx-template` 스킬이 설치되어 있어야 합니다. Word·PDF가 필요하면 그렇게 요청하면 됩니다.
-
-## 4. 사용법 ② — 논문 저장과 요약 노트
-
-입력할 수 있는 것: DOI, arXiv 번호나 URL, PDF 파일 경로, PDF URL
+Claude Code에 이렇게 말하면 Claude가 설치까지 해 줍니다.
 
 ```text
-이 논문 라이브러리에 추가하고 요약해줘: 2510.27028
-C:\Downloads\paper.pdf 라이브러리에 넣고 요약해줘
+https://github.com/emilyJ7/paper-summary 스킬을 ~/.claude/skills/paper-summary에 설치하고 필요한 파이썬 패키지도 설치해줘
+```
+
+설치가 끝나면 Claude Code를 다시 시작하고 이렇게 확인합니다.
+
+```text
+paper-summary 스킬로 arXiv 2510.27028 논문 라이브러리에 추가해봐
+```
+
+- 주제 검색을 쓰려면 claude.ai → 설정 → 커넥터에서 **SciSpace**를 연결하세요. PubMed, alphaXiv 커넥터도 연결하면 검색 범위가 넓어집니다.
+- 커넥터가 없어도 DOI·arXiv 번호·PDF로 논문을 추가하고 요약·인용하는 기능은 그대로 됩니다.
+
+## 3. 주제로 문헌 조사
+
+```text
+/paper-summary rPPG 기반 심박·HRV 추정 정확도 연구 정리해줘
+/paper-summary 최근 3년 LLM 에이전트 메모리 연구 10편 정도 비교해줘
+/paper-summary 노쇠(frailty) 예측 연구, 임상 논문 위주로 찾아줘
+```
+
+Claude가 하는 일: 주제를 검색 질문으로 바꿔 SciSpace에서 찾고, 5~10편을 골라 핵심 요약, 비교표, 논문별 메모, 연구 공백, 참고문헌 순서로 정리합니다.
+
+이어서 이렇게 말할 수 있습니다.
+
+```text
+여기서 고른 논문들 라이브러리에도 등록해줘
+이 결과 한글(hwpx) 문서로 만들어줘
+2번하고 5번 논문만 더 자세히 비교해줘
+```
+
+> 조건(기간, 대상, 논문 수, 분야)을 함께 말하면 결과가 더 정확합니다.
+
+## 4. 논문 한 편 저장과 요약
+
+```text
+이 논문 라이브러리에 추가하고 요약해줘: 10.1038/s41598-026-70292-0
+arXiv 2601.09742 요약해서 라이브러리에 넣어줘
+C:\Users\me\Desktop\paper.pdf 논문 요약해줘
 ```
 
 Claude가 하는 일:
 
-1. 서지 정보(제목, 저자, 연도, 학술지, DOI)를 무료 API에서 가져옵니다.
-2. 공개 PDF가 있으면 내려받아 쪽 번호가 표시된 본문(`text.md`)을 만듭니다.
-3. 「Figure N」 캡션을 기준으로 그림을 잘라 `figures/`에 저장합니다.
-4. 본문을 읽고 요약 노트(`summary.md`)를 씁니다. 섹션은 Essence, Motivation, How, Achievement, Limitations, 메모 순서입니다.
-5. 요약 노트의 모든 사실 문장에는 출처 키와 쪽 번호를 답니다. 예: `[@Pstras2026estimating, p. 7]`
-6. 보기용 HTML 페이지(`index.html`)를 만듭니다.
+1. 서지 정보(제목, 저자, 연도, 학술지, DOI)를 가져옵니다.
+2. 본문을 쪽 번호와 함께 저장하고, 그림을 캡션 기준으로 잘라 저장합니다.
+3. 본문을 읽고 요약 노트를 씁니다. 모든 사실 문장에 출처와 쪽 번호(`[@Pstras2026estimating, p. 7]`)를 답니다.
+4. 브라우저로 볼 수 있는 페이지를 만듭니다.
 
-유의할 점:
-
-- 디스크가 부족하면 "PDF는 지워줘"라고 하세요. `--no-pdf` 옵션으로 추출만 하고 PDF는 남기지 않습니다.
-
-### 유료 논문 (초록만 있는 경우)
-
-1. DOI로 추가하면 서지와 초록만 저장되고, 목록에 `PDF대기`로 표시됩니다. 요약은 초록 기준의 임시 요약입니다.
-2. 도서관이나 출판사에서 PDF를 받은 뒤 `이 PDF로 정리해줘: C:\Downloads\paper.pdf`라고 말합니다.
-3. Claude가 PDF의 DOI나 제목으로 같은 항목을 찾아 본문과 그림을 채우고, 요약을 본문 기준(쪽 번호 인용 포함)으로 다시 씁니다. 기존 서지 정보는 그대로 유지됩니다.
-4. 스캔본처럼 제목을 읽을 수 없는 PDF는 citekey를 함께 알려 주세요. 예: `이 PDF를 Mohamad2026physqual에 붙여줘`
-5. PDF를 기다리는 논문은 "PDF 대기 목록 보여줘"로 모아 볼 수 있습니다.
-
-## 5. 사용법 ③ — 글쓰기와 자동 인용
+요약이 끝난 뒤에는 이렇게 말할 수 있습니다.
 
 ```text
-라이브러리의 HRV 논문들로 연구 배경 한 단락 써주고 참고문헌 IEEE로 달아줘
+방금 요약한 논문 HTML로 열어줘
+이 논문 그림 1 설명해줘
+요약에서 Limitations 부분 더 자세히 써줘
+디스크가 부족하니 PDF는 지워줘
 ```
 
-1. Claude가 라이브러리를 검색하고, 관련 논문의 요약 노트와 본문을 읽습니다.
-2. 원고에는 인용 키를 그대로 씁니다. 예: `[@Pstras2026estimating, p. 7]`
-3. `cite` 명령이 키를 본문 인용으로 바꾸고, 원고 끝에 참고문헌 목록을 붙입니다.
+### 유료 논문 (초록만 있을 때)
 
-### 인용 표기 규칙
+```text
+이 논문 추가해줘: 10.1016/j.smhl.2026.100683
+```
 
-| 원고에 쓰는 형식 | APA 결과 | IEEE 결과 |
+1. 공개 PDF가 없으면 서지 정보와 초록만 저장되고, 목록에 `PDF대기`로 표시됩니다. 요약은 초록 기준의 임시 요약입니다.
+2. 도서관이나 출판사에서 PDF를 받으면 이렇게 말합니다.
+
+```text
+이 PDF로 정리해줘: C:\Downloads\physqual.pdf
+```
+
+3. Claude가 DOI나 제목으로 같은 논문을 찾아 본문과 그림을 채우고, 요약을 본문 기준으로 다시 씁니다.
+4. 스캔본처럼 제목을 읽을 수 없는 PDF는 어느 논문인지 알려 주세요.
+
+```text
+이 PDF를 Mohamad2026physqual에 붙여줘: C:\Downloads\scan.pdf
+PDF 기다리는 논문 목록 보여줘
+```
+
+## 5. 저장한 논문 찾고 보기
+
+```text
+라이브러리에 있는 논문 목록 보여줘
+라이브러리에서 SDNN 언급한 논문 찾아줘
+Sampath2026adaptive 요약 보여줘
+라이브러리 목록 페이지 열어줘
+아직 요약 안 한 논문 요약해줘
+```
+
+> 라이브러리는 `~/paper-library`에 있습니다. 논문마다 폴더가 하나씩 있고, 폴더 이름이 인용 키입니다(예: `Sampath2026adaptive`).
+
+## 6. 글쓰기와 자동 인용
+
+### Claude에게 글을 맡길 때
+
+```text
+라이브러리의 HRV 논문들로 연구 배경 한 단락 써주고 참고문헌 APA로 달아줘
+Sampath2026adaptive 내용을 인용해서 MCP 에이전트 설계 시사점 정리해줘
+요약한 rPPG 논문들로 선행연구 표 만들고 IEEE 참고문헌 붙여줘
+```
+
+Claude는 요약 노트를 재료로 글을 쓰고, 인용 표시를 그대로 옮긴 뒤 본문 인용과 참고문헌 목록을 자동으로 만듭니다. 원고(인용 키 상태)와 완성본(`_cited.md`)이 함께 저장됩니다.
+
+### 내가 쓴 원고에 참고문헌만 달 때
+
+원고에 인용하고 싶은 자리마다 인용 키를 적어 두고 Claude에게 맡깁니다.
+
+```markdown
+도구가 많아지면 단일 에이전트는 선택이 흐려진다[@Sampath2026adaptive, p. 2].
+HRV는 카메라로도 추정할 수 있다[@Pstras2026estimating; @Rouast2025vitallens].
+```
+
+```text
+draft.md 참고문헌 APA로 달아줘
+draft.md IEEE 형식으로 바꿔줘
+draft.md 참고문헌을 한글 문서용 표로 만들어줘
+```
+
+인용 키를 모르면 이렇게 물어봅니다.
+
+```text
+SDNN 정확도 다룬 논문 인용 키 알려줘
+이 문장에 맞는 출처 라이브러리에서 찾아서 인용 달아줘: "얼굴 영상으로 HRV를 추정할 수 있다"
+```
+
+### 결과 형식
+
+| 원고에 적힌 인용 | APA로 달면 | IEEE로 달면 |
 |---|---|---|
 | `[@Pstras2026estimating]` | (Pstras et al., 2026) | [1] |
 | `[@Pstras2026estimating, p. 7]` | (Pstras et al., 2026, p. 7) | [1, p. 7] |
 | `[@Pstras2026estimating; @Rouast2025vitallens]` | (Pstras et al., 2026; Rouast, 2025) | [1, 2] |
 
 - APA는 참고문헌을 저자 알파벳순으로, IEEE는 본문에 처음 나온 순서대로 번호를 매깁니다.
-- 라이브러리에 없는 키는 `??키`로 표시됩니다. 그 논문을 추가하거나 키 오타를 고치면 됩니다.
-- 원고 원본은 그대로 두고 `원고_cited.md`를 새로 만듭니다. 고칠 때는 원본을 고친 뒤 다시 실행합니다.
-- `--table` 옵션을 쓰면 한글 문서용 참고문헌 표(번호, 저자(연도), 논문·출처, DOI)를 만듭니다.
+- 라이브러리에 없는 논문을 인용하면 `??키`로 표시되고, Claude가 그 논문을 추가할지 묻습니다.
+- 최종 문서는 `Word로 만들어줘`, `PDF로 만들어줘`, `한글(hwpx)로 만들어줘`라고 하면 됩니다. LaTeX를 쓰면 `~/paper-library/library.bib`를 그대로 씁니다.
 
-## 6. 명령어 정리 (직접 실행할 때)
+## 7. 잘 쓰는 요령
 
-평소에는 Claude에게 말로 시키면 되고, 아래 명령을 직접 실행할 필요는 없습니다.
-
-| 명령 | 설명 |
-|---|---|
-| `paperlib.py add <입력> [--no-pdf]` | 논문 등록, 본문·그림 추출 |
-| `paperlib.py add <PDF 경로> [--key <citekey>]` | 유료 논문에 나중에 받은 PDF 붙이기 |
-| `paperlib.py list [--pending]` | 라이브러리 목록 (`--pending`: PDF 대기만) |
-| `paperlib.py search <단어...>` | 제목·초록·요약·본문 검색 |
-| `paperlib.py show <citekey>` | 서지 정보와 파일 목록 |
-| `paperlib.py cite <원고.md> [--style apa\|ieee] [--table] [-o 결과.md]` | 인용 키를 본문 인용으로 바꾸고 참고문헌 생성 |
-| `paperlib.py render [citekey]` | 요약 노트를 HTML로 만들기 |
-| `paperlib.py rebuild` | `library.json`·`library.bib` 다시 만들기 |
-
-실행 위치: `python ~/.claude/skills/paper-summary/scripts/paperlib.py <명령>` (macOS·Linux는 `python3`)
-
-## 7. 라이브러리 구조
-
-라이브러리 위치는 기본값이 `~/paper-library`이고, 환경 변수 `PAPER_LIB`로 바꿀 수 있습니다.
-
-```text
-paper-library/
-  index.html      라이브러리 목록 페이지
-  library.json    목록 데이터
-  library.bib     BibTeX (LaTeX·다른 도구에서 그대로 사용 가능)
-  papers/<citekey>/
-    meta.json     서지 정보
-    paper.pdf     원문 (--no-pdf면 없음)
-    text.md       <!-- page N --> 쪽 표시가 달린 본문
-    figures/      fig1.jpg …  + figures.json (번호·쪽·캡션)
-    summary.md    요약 노트 (문장마다 [@키, p. N])
-    index.html    보기용 페이지
-```
-
-- citekey는 `제1저자 성 + 연도 + 제목 첫 단어` 형식입니다. 예: `Pstras2026estimating`
-- 같은 DOI나 arXiv 번호를 다시 추가하면 새로 만들지 않고 기존 폴더를 갱신합니다.
+- **조건을 구체적으로**: "최근 5년", "임상 연구만", "10편", "한국어로" 같은 조건을 붙이면 결과가 좋아집니다.
+- **숫자는 출처 확인**: Claude는 출처에 있는 수치만 쓰고 쪽 번호를 답니다. 중요한 수치는 "이 수치 원문 몇 쪽인지 보여줘"로 확인하세요.
+- **요약은 다시 쓸 수 있음**: "요약을 실무자 관점으로 다시 써줘", "How 부분 수식 포함해서 자세히"처럼 요청하면 요약 노트를 고쳐 줍니다.
+- **원고는 인용 키 상태로 관리**: 글을 고칠 때는 원고를 고치고 "참고문헌 다시 달아줘"라고 하면 번호가 자동으로 다시 매겨집니다.
 
 ## 8. 자주 묻는 질문
 
 **Q. API 비용이 드나요?**
-아니요. 스크립트는 키가 필요 없는 무료 공개 API만 부르고, 요약은 Claude Code 대화 안에서 이루어집니다. 다만 Claude Code 자체의 사용량은 평소처럼 쓰입니다.
+아니요. 무료 공개 API만 쓰고, 요약은 Claude Code 대화 안에서 이루어집니다. Claude Code 사용량은 평소처럼 쓰입니다.
 
 **Q. 그림이 안 나오거나 잘못 잘렸어요.**
-그림 추출은 「Figure N:」「Fig. N」 캡션을 기준으로 합니다. 레이아웃이 특이한 PDF에서는 일부 그림을 놓칠 수 있습니다. Claude가 요약할 때 그림을 확인하고 잘못된 그림은 요약에서 뺍니다.
+"이 논문 그림 다시 확인해줘"라고 하세요. 그림 추출은 캡션 기준이라 레이아웃이 특이한 PDF에서는 놓칠 수 있고, Claude가 요약할 때 잘못된 그림은 뺍니다.
 
-**Q. 라이브러리를 다른 컴퓨터로 옮기거나 공유할 수 있나요?**
-`paper-library` 폴더를 통째로 복사하면 됩니다. 다만 PDF와 본문이 들어 있으니 공개 저장소에는 올리지 마세요.
+**Q. 라이브러리를 다른 컴퓨터로 옮기려면?**
+`paper-library` 폴더를 통째로 복사하면 됩니다. PDF와 본문이 들어 있으니 공개 저장소에는 올리지 마세요.
 
 **Q. 스킬을 최신 버전으로 받으려면?**
-`git -C ~/.claude/skills/paper-summary pull`
+`paper-summary 스킬 최신 버전으로 업데이트해줘`라고 말하면 됩니다.
 
-**Q. LaTeX로 쓰는데 쓸 수 있나요?**
-`library.bib`를 그대로 쓰면 됩니다. citekey가 같아서 `\cite{Pstras2026estimating}`로 인용할 수 있습니다.
+## 부록. 직접 실행할 때의 명령
+
+평소에는 필요 없습니다. Claude가 아래 명령을 대신 실행합니다.
+
+| 명령 | 설명 |
+|---|---|
+| `paperlib.py add <DOI·arXiv·PDF> [--no-pdf] [--key <키>]` | 논문 등록, 받은 PDF 붙이기 |
+| `paperlib.py list [--pending]` | 목록 (`--pending`: PDF 대기만) |
+| `paperlib.py search <단어...>` | 제목·초록·요약·본문 검색 |
+| `paperlib.py cite <원고.md> [--style apa\|ieee] [--table]` | 인용 키 → 본문 인용 + 참고문헌 |
+| `paperlib.py render [키]` | 요약 노트 → HTML |
+
+실행 위치: `python ~/.claude/skills/paper-summary/scripts/paperlib.py <명령>`

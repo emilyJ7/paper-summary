@@ -41,13 +41,24 @@ git -C ~/.claude/skills/paper-summary pull
 claude.ai → 설정 → 커넥터 → SciSpace 연결. PubMed, alphaXiv, bioRxiv 커넥터도 연결하면 검색을 보강합니다.
 커넥터가 없어도 DOI, arXiv 번호, PDF로 논문을 추가하고 요약·인용하는 기능은 그대로 쓸 수 있습니다.
 
-## 사용 예 (Claude Code에서 말로)
+## 사용법 — Claude에게 이렇게 말하세요
 
-- `/paper-summary rPPG 기반 HRV 추정 연구 정리해줘` — 검색 → 선별 → 라이브러리 등록 → 종합
-- `이 논문 라이브러리에 추가하고 요약해줘: 10.1038/s41598-026-70292-0` — DOI, arXiv ID, PDF 경로 모두 가능
-- `라이브러리에 있는 HRV 논문들로 서론 한 단락 써주고 참고문헌 IEEE로 달아줘`
+명령어를 외울 필요가 없습니다. Claude Code에서 아래처럼 말하면 Claude가 알아서 실행합니다. 자세한 내용은 [사용 가이드](docs/paper-summary_사용가이드.md)(Word·PDF·PPT 버전도 `docs/`에 있음)를 보세요.
 
-## 명령어 (직접 실행할 때)
+| 하고 싶은 일 | Claude에게 이렇게 말하기 |
+|---|---|
+| 설치 | `https://github.com/emilyJ7/paper-summary 스킬 설치하고 패키지도 설치해줘` |
+| 주제로 논문 조사 | `/paper-summary rPPG 기반 HRV 추정 연구 정리해줘` |
+| 논문 저장·요약 | `이 논문 라이브러리에 추가하고 요약해줘: 10.1038/s41598-026-70292-0` |
+| 가진 PDF 정리 | `Downloads 폴더의 paper.pdf 논문 요약해줘` |
+| 유료 논문 PDF 붙이기 | `이 PDF로 정리해줘: <PDF 경로>` |
+| 저장한 논문 찾기 | `라이브러리에서 SDNN 언급한 논문 찾아줘` |
+| 글쓰기 + 인용 | `라이브러리의 HRV 논문들로 연구 배경 써주고 참고문헌 APA로 달아줘` |
+| 내 원고에 참고문헌 | `draft.md 참고문헌 IEEE로 달아줘` |
+| 출처 찾아 인용 | `이 문장에 맞는 출처 찾아서 인용 달아줘: "…"` |
+| 업데이트 | `paper-summary 스킬 최신 버전으로 업데이트해줘` |
+
+## 명령어 (직접 실행할 때, 참고)
 
 ```bash
 P="python ~/.claude/skills/paper-summary/scripts/paperlib.py"

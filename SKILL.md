@@ -52,6 +52,16 @@ paper-library/
    - 결과의 `missing`에 키가 있으면(본문에 `??키`로 표시됨) 그 논문을 `add` 하거나 키 오타를 고친다.
 4. 원본 원고(인용 키 상태)는 그대로 두고 `_cited.md`를 따로 만든다. 다시 고칠 때는 원본을 고치고 cite를 다시 실행한다.
 
+## D. 관리 요청
+
+- "스킬 설치해줘" → `git clone https://github.com/emilyJ7/paper-summary.git ~/.claude/skills/paper-summary` 후 `pip install -r requirements.txt`, Claude Code 재시작 안내
+- "스킬 최신 버전으로 업데이트해줘" → `git -C ~/.claude/skills/paper-summary pull` 후 `pip install -r requirements.txt`, 바뀐 내용 요약
+- "라이브러리 목록 페이지 열어줘", "요약 HTML로 열어줘" → `render` 후 해당 `index.html`을 링크로 알려 준다.
+- "PDF 기다리는 논문 목록" → `list --pending`
+- "아직 요약 안 한 논문 요약해줘" → `list`에서 `요약X`인 항목을 B-3 방식으로 요약
+- 원고 인용에서 `missing` 키가 나오면 그 논문을 라이브러리에 추가할지 사용자에게 묻는다.
+- "이 문장에 맞는 출처 찾아서 인용 달아줘" → `search`와 summary.md에서 근거를 찾아 쪽 번호와 함께 `[@키, p. N]`을 단다. 근거가 없으면 없다고 말한다.
+
 ## 유의
 
 - 요약·종합은 이 대화에서 Claude가 직접 하므로 별도 LLM API 비용이 없다. 스크립트는 무료 공개 API만 부른다.
