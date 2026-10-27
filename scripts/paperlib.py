@@ -104,6 +104,40 @@ def search_title(title):
     return ""
 
 
+def norm_title(s):
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def same_title(a, b):
+    """PDF에서 읽은 제목과 검색 결과 제목이 같은 논문인지 (앞 40자 기준)."""
+    a, b = norm_title(a), norm_title(b)
+    return bool(a and b) and (a[:40] in b or b[:40] in a)
+
+
+def pdf_title(doc):
+    """PDF 메타데이터의 제목, 없으면 1쪽에서 가장 큰 글자 줄들."""
+    t = (doc.metadata or {}).get("title", "").strip()
+    if len(t) > 15:
+        return t
+    spans = [(s["size"], s["text"]) for b in doc[0].get_text("dict")["blocks"] for l in b.get("lines", []) for s in l["spans"]
+             if s["text"].strip()]
+    big = max(sz for sz, _ in spans)
+    return " ".join(tx.strip() for sz, tx in spans if sz >= big - 0.5)
+
+
+def arxiv_by_title(title):
+    words = [w for w in re.findall(r"[A-Za-z0-9-]+", title) if w.lower() not in STOP][:8]
+    r = requests.get("https://export.arxiv.org/api/query", headers=UA, timeout=30,
+                     params={"search_query": " AND ".join(f"ti:{w}" for w in words), "max_results": 5})
+    r.raise_for_status()
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    for e in ET.fromstring(r.text).findall("a:entry", ns):
+        if same_title(" ".join((e.findtext("a:title", "", ns)).split()), title):
+            aid = e.findtext("a:id", "", ns).rsplit("/", 1)[-1]
+            return from_arxiv(re.sub(r"v\d+$", "", aid))
+    return None
+
+
 ARXIV_RE = re.compile(r"(?:arxiv\.org/(?:abs|pdf)/|arxiv:\s*)?(\d{4}\.\d{4,5})(v\d+)?", re.I)
 DOI_RE = re.compile(r"\b(10\.\d{4,9}/[^\s\"<>]+)", re.I)
 
@@ -113,20 +147,33 @@ def resolve(src):
     p = Path(src)
     if p.suffix.lower() == ".pdf" and p.exists():
         doc = fitz.open(p)
-        head = "".join(doc[i].get_text() for i in range(min(2, len(doc))))
-        m = ARXIV_RE.search(head) if "arxiv" in head.lower() else None
+        head = doc[0].get_text()  # 1쪽만: 2쪽부터는 참고문헌의 DOI·arXiv 번호가 섞일 수 있음
+        title = pdf_title(doc)
+        meta = None
         d = DOI_RE.search(head)
-        if d:
-            meta = from_crossref(d.group(1).rstrip(".,;)"))
-        elif m:
-            meta = from_arxiv(m.group(1))
-        else:
-            title = doc.metadata.get("title") or max(
-                (s for b in doc[0].get_text("dict")["blocks"] for l in b.get("lines", []) for s in l["spans"]),
-                key=lambda s: s["size"])["text"]
-            doi = search_title(title)
-            meta = from_crossref(doi) if doi else {"title": title.strip(), "authors": [], "year": None, "venue": "",
-                                                   "doi": "", "url": "", "abstract": "", "source": "pdf"}
+        m = ARXIV_RE.search(head) if "arxiv" in head.lower() else None
+        for get in ((lambda: from_crossref(d.group(1).rstrip(".,;)"))) if d else None,
+                    (lambda: from_arxiv(m.group(1))) if m else None,
+                    lambda: from_crossref(search_title(title)) if search_title(title) else None,
+                    lambda: arxiv_by_title(title)):
+            if get is None:
+                continue
+            try:
+                cand = get()
+            except Exception:
+                cand = None
+            if cand and same_title(cand["title"], title):
+                meta = cand
+                break
+        if meta and meta.get("arxiv") and meta.get("doi"):
+            try:
+                pub = from_crossref(meta["doi"])
+                pub.update(arxiv=meta["arxiv"], source="crossref+arxiv")
+                meta = pub
+            except Exception:
+                pass
+        meta = meta or {"title": title, "authors": [], "year": None, "venue": "", "doi": "", "url": "",
+                        "abstract": "", "source": "pdf"}
         return meta, p
     m = ARXIV_RE.fullmatch(src.strip()) or (ARXIV_RE.search(src) if "arxiv" in src.lower() else None)
     if m:
@@ -461,7 +508,8 @@ def cmd_render(a):
     keys = [a.key] if a.key else [p.name for p in sorted(PAPERS.iterdir()) if (p / "meta.json").exists()]
     for k in keys:
         render_one(k)
-    rows = "".join(f"<tr><td><a href='papers/{r['key']}/index.html'>{html.escape(r['title'])}</a></td><td>{html.escape(r['authors'][:40])}</td>"
+    rebuild()  # summary.md가 새로 생겼을 수 있으니 목록 갱신
+    rows ="".join(f"<tr><td><a href='papers/{r['key']}/index.html'>{html.escape(r['title'])}</a></td><td>{html.escape(r['authors'][:40])}</td>"
                    f"<td>{r['year'] or ''}</td><td><code>{r['key']}</code></td><td>{'✓' if r['has_summary'] else ''}</td></tr>"
                    for r in json.loads((LIB / "library.json").read_text(encoding="utf-8")))
     (LIB / "index.html").write_text(page_html("논문 라이브러리", "<h1>논문 라이브러리</h1><table><tr><th>제목</th><th>저자</th><th>연도</th><th>인용 키</th><th>요약</th></tr>"
