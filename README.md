@@ -73,8 +73,8 @@ claude.ai → 설정 → 커넥터 → SciSpace 연결. PubMed, alphaXiv, bioRxi
 | 보고서·보도자료 저장 | `이 보고서 정리해줘: <PDF 경로 또는 URL>` |
 | 서지 고치기 | `이 보고서 발행 기관을 KISTEP으로, 보고서 번호를 2025-12로 고쳐줘` |
 | 저장한 논문 찾기 | `라이브러리에서 SDNN 언급한 논문 찾아줘` |
-| 글쓰기 + 인용 | `라이브러리의 HRV 논문들로 연구 배경 써주고 참고문헌 APA로 달아줘` |
-| 내 원고에 참고문헌 | `draft.md 참고문헌 IEEE로 달아줘` |
+| 글쓰기 + 인용 | `라이브러리의 HRV 논문들로 연구 배경 써주고 참고문헌 달아줘` (기본: 본문 [1], 끝에 번호순 참고문헌) |
+| 내 원고에 참고문헌 | `draft.md 참고문헌 달아줘` (APA가 필요하면 `APA로`) |
 | 출처 찾아 인용 | `이 문장에 맞는 출처 찾아서 인용 달아줘: "…"` |
 | 업데이트 | `paper-summary 스킬 최신 버전으로 업데이트해줘` |
 
@@ -89,7 +89,7 @@ $P add <받은 PDF 경로> [--key <citekey>]                         # 유료 �
 $P list [--pending]                                             # 목록 (--pending: PDF 대기만)
 $P search HRV ECG                                               # 제목·초록·요약·본문 검색
 $P show Pstras2026estimating                                    # 서지·파일 보기
-$P cite 원고.md --style apa|ieee [--table] [-o 결과.md]          # [@키] → 본문 인용 + 참고문헌
+$P cite 원고.md [--style ieee|apa] [--table] [-o 결과.md]        # [@키] → 본문 [1] + 참고문헌 (기본 IEEE)
 $P render [citekey]                                             # summary.md → index.html
 $P rebuild                                                      # library.json·library.bib 재생성
 ```

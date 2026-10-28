@@ -46,8 +46,9 @@ paper-library/
 
 1. 라이브러리에서 재료를 찾는다: `list`, `search <단어...>`(제목·초록·summary·본문 검색), `show <citekey>`.
 2. 관련 `summary.md`와 `text.md`를 읽고 원고를 쓴다. **인용은 반드시 `[@citekey]`·`[@citekey, p. N]`·`[@a; @b]` 형식**으로 쓰고, 번호나 저자명을 손으로 쓰지 않는다. summary의 문장을 옮기면 그 문장의 인용 표시도 함께 옮긴다.
-3. 참고문헌 생성: `cite 원고.md [-o 결과.md] [--style apa|ieee] [--table] [--heading 참고문헌]`
-   - APA는 본문에 (Pstras et al., 2026, p. 7) 형식, 참고문헌은 알파벳순이다.
+3. 참고문헌 생성: `cite 원고.md [-o 결과.md] [--style ieee|apa] [--table] [--heading 참고문헌]`
+   - **기본은 IEEE 번호식**이다(이 팀의 표준: 본문 `[1]`, 끝에 번호순 참고문헌). 사용자가 형식을 말하지 않으면 IEEE로 한다.
+   - APA는 사용자가 요청할 때만 쓴다. 본문 (Pstras et al., 2026, p. 7), 참고문헌은 알파벳순이다.
    - IEEE는 등장 순서대로 [1], [1, p. 7] 형식이다.
    - `--table`은 한글(hwpx) 문서용 참고문헌 표(번호/저자(연도)/논문·출처/DOI)를 만든다. 결과 md를 `hwpx-template` 스킬(설치돼 있을 때)로 넘기면 된다.
    - 결과의 `missing`에 키가 있으면(본문에 `??키`로 표시됨) 그 논문을 `add` 하거나 키 오타를 고친다.

@@ -14,7 +14,7 @@
   python paperlib.py set <citekey> 필드=값 ...     (보고서 서지 보완: type authors year publisher number url date accessed short title)
   python paperlib.py rename <citekey> <새 citekey>
   python paperlib.py list [--pending] | search <단어...> | show <citekey>
-  python paperlib.py cite <원고.md> [-o 결과.md] [--style apa|ieee] [--table] [--heading 참고문헌]
+  python paperlib.py cite <원고.md> [-o 결과.md] [--style ieee|apa] [--table] [--heading 참고문헌]   (기본: IEEE 번호식 [1])
   python paperlib.py render [citekey]      summary.md → index.html (라이브러리 목록 index.html 포함)
   python paperlib.py rebuild
 
@@ -784,7 +784,7 @@ def main():
     p = sp.add_parser("search"); p.add_argument("terms", nargs="+"); p.set_defaults(f=cmd_search)
     p = sp.add_parser("show"); p.add_argument("key"); p.set_defaults(f=cmd_show)
     p = sp.add_parser("cite"); p.add_argument("draft"); p.add_argument("-o", "--output")
-    p.add_argument("--style", choices=["apa", "ieee"], default="apa"); p.add_argument("--table", action="store_true")
+    p.add_argument("--style", choices=["apa", "ieee"], default="ieee", help="기본 ieee: 본문 [1], 참고문헌 번호순"); p.add_argument("--table", action="store_true")
     p.add_argument("--heading", default="참고문헌"); p.set_defaults(f=cmd_cite)
     p = sp.add_parser("render"); p.add_argument("key", nargs="?"); p.set_defaults(f=cmd_render)
     sp.add_parser("rebuild").set_defaults(f=lambda a: print(f"{len(rebuild())}편 색인"))

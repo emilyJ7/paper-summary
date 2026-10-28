@@ -15,8 +15,8 @@ Claude Code에서 자연어로 말하기만 하면, 논문·정책 보고서·�
 | 정책 자료 조사 | `/paper-summary AI 인재정책 관련 국내외 정책 보고서와 논문 조사해줘` |
 | 보고서·보도자료 저장 | `이 보고서 정리해줘: <PDF 경로 또는 URL>` |
 | 저장한 논문 찾기 | `라이브러리에서 HRV 관련 논문 찾아줘` |
-| 글쓰기 + 인용 | `라이브러리의 HRV 논문들로 연구 배경 써주고 참고문헌 APA로 달아줘` |
-| 내 원고에 참고문헌 | `draft.md 참고문헌 IEEE로 달아줘` |
+| 글쓰기 + 인용 | `라이브러리의 HRV 논문들로 연구 배경 써주고 참고문헌 달아줘` |
+| 내 원고에 참고문헌 | `draft.md 참고문헌 달아줘` |
 
 > 팁: 처음에 `/paper-summary`를 붙이면 이 스킬을 확실히 씁니다. 붙이지 않아도 "논문 요약", "참고문헌" 같은 말이 있으면 Claude가 알아서 이 스킬을 고릅니다.
 
@@ -164,7 +164,7 @@ Sampath2026adaptive 요약 보여줘
 ### Claude에게 글을 맡길 때
 
 ```text
-라이브러리의 HRV 논문들로 연구 배경 한 단락 써주고 참고문헌 APA로 달아줘
+라이브러리의 HRV 논문들로 연구 배경 한 단락 써주고 참고문헌 달아줘
 Sampath2026adaptive 내용을 인용해서 MCP 에이전트 설계 시사점 정리해줘
 요약한 rPPG 논문들로 선행연구 표 만들고 IEEE 참고문헌 붙여줘
 ```
@@ -181,8 +181,8 @@ HRV는 카메라로도 추정할 수 있다[@Pstras2026estimating; @Rouast2025vi
 ```
 
 ```text
-draft.md 참고문헌 APA로 달아줘
-draft.md IEEE 형식으로 바꿔줘
+draft.md 참고문헌 달아줘
+draft.md APA 형식으로 바꿔줘
 draft.md 참고문헌을 한글 문서용 표로 만들어줘
 ```
 
@@ -195,13 +195,14 @@ SDNN 정확도 다룬 논문 인용 키 알려줘
 
 ### 결과 형식
 
-| 원고에 적힌 인용 | APA로 달면 | IEEE로 달면 |
+| 원고에 적힌 인용 | 기본 (IEEE 번호식) | APA로 요청하면 |
 |---|---|---|
-| `[@Pstras2026estimating]` | (Pstras et al., 2026) | [1] |
-| `[@Pstras2026estimating, p. 7]` | (Pstras et al., 2026, p. 7) | [1, p. 7] |
-| `[@Pstras2026estimating; @Rouast2025vitallens]` | (Pstras et al., 2026; Rouast, 2025) | [1, 2] |
+| `[@Pstras2026estimating]` | [1] | (Pstras et al., 2026) |
+| `[@Pstras2026estimating, p. 7]` | [1, p. 7] | (Pstras et al., 2026, p. 7) |
+| `[@Pstras2026estimating; @Rouast2025vitallens]` | [1, 2] | (Pstras et al., 2026; Rouast, 2025) |
 
-- APA는 참고문헌을 저자 알파벳순으로, IEEE는 본문에 처음 나온 순서대로 번호를 매깁니다.
+- **기본은 IEEE 번호식**입니다. 본문에 `[1]`, `[1, p. 7]`처럼 넣고, 끝의 참고문헌은 본문에 처음 나온 순서대로 번호를 매깁니다.
+- APA가 필요하면 "APA로"라고 말하면 됩니다(본문은 저자-연도, 참고문헌은 알파벳순).
 - 라이브러리에 없는 논문을 인용하면 `??키`로 표시되고, Claude가 그 논문을 추가할지 묻습니다.
 - 최종 문서는 `Word로 만들어줘`, `PDF로 만들어줘`, `한글(hwpx)로 만들어줘`라고 하면 됩니다. LaTeX를 쓰면 `~/paper-library/library.bib`를 그대로 씁니다.
 
@@ -237,7 +238,7 @@ SDNN 정확도 다룬 논문 인용 키 알려줘
 | `paperlib.py rename <키> <새 키>` | 인용 키 바꾸기 |
 | `paperlib.py list [--pending]` | 목록 (`--pending`: PDF 대기만) |
 | `paperlib.py search <단어...>` | 제목·초록·요약·본문 검색 |
-| `paperlib.py cite <원고.md> [--style apa\|ieee] [--table]` | 인용 키 → 본문 인용 + 참고문헌 |
+| `paperlib.py cite <원고.md> [--style ieee\|apa] [--table]` | 인용 키 → 본문 [1] + 참고문헌 (기본 IEEE) |
 | `paperlib.py render [키]` | 요약 노트 → HTML |
 
 실행 위치: Windows PowerShell은 `python "$HOME\.claude\skills\paper-summary\scripts\paperlib.py" <명령>`, macOS·Linux는 `python3 ~/.claude/skills/paper-summary/scripts/paperlib.py <명령>`
