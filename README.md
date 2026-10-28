@@ -1,6 +1,6 @@
 # paper-summary — Claude Code 논문 요약·인용 스킬
 
-Claude Code에서 논문을 찾고 요약해 **로컬 논문 라이브러리**에 쌓아 두었다가, 글을 쓸 때 `[@citekey]`로 인용하면 **참고문헌을 자동으로 달아 주는** 스킬입니다.
+Claude Code에서 논문·정책 보고서·웹 자료를 찾고 요약해 **로컬 논문 라이브러리**에 쌓아 두었다가, 글을 쓸 때 `[@citekey]`로 인용하면 **참고문헌을 자동으로 달아 주는** 스킬입니다.
 
 - Zotero 없이 동작하고 LLM API 키도 필요 없습니다.
   - 서지 정보는 무료 공개 API(Crossref, arXiv, OpenAlex)에서 가져옵니다.
@@ -69,6 +69,9 @@ claude.ai → 설정 → 커넥터 → SciSpace 연결. PubMed, alphaXiv, bioRxi
 | 논문 저장·요약 | `이 논문 라이브러리에 추가하고 요약해줘: 10.1038/s41598-026-70292-0` |
 | 가진 PDF 정리 | `Downloads 폴더의 paper.pdf 논문 요약해줘` |
 | 유료 논문 PDF 붙이기 | `이 PDF로 정리해줘: <PDF 경로>` |
+| 정책 자료 조사 | `/paper-summary AI 인재정책 관련 국내외 정책 보고서와 논문 조사해줘` |
+| 보고서·보도자료 저장 | `이 보고서 정리해줘: <PDF 경로 또는 URL>` |
+| 서지 고치기 | `이 보고서 발행 기관을 KISTEP으로, 보고서 번호를 2025-12로 고쳐줘` |
 | 저장한 논문 찾기 | `라이브러리에서 SDNN 언급한 논문 찾아줘` |
 | 글쓰기 + 인용 | `라이브러리의 HRV 논문들로 연구 배경 써주고 참고문헌 APA로 달아줘` |
 | 내 원고에 참고문헌 | `draft.md 참고문헌 IEEE로 달아줘` |
@@ -80,6 +83,8 @@ claude.ai → 설정 → 커넥터 → SciSpace 연결. PubMed, alphaXiv, bioRxi
 ```bash
 P="python ~/.claude/skills/paper-summary/scripts/paperlib.py"
 $P add <DOI | arXiv ID/URL | PDF 경로 | PDF URL> [--no-pdf]   # 등록(+본문·그림 추출)
+$P set <citekey> authors="과학기술정책연구원" year=2025 number="정책연구 2025-07"   # 보고서 서지 보완
+$P rename <citekey> <새 citekey>                               # 인용 키 바꾸기
 $P add <받은 PDF 경로> [--key <citekey>]                         # 유료 논문: 나중에 받은 PDF를 기존 항목에 붙이기
 $P list [--pending]                                             # 목록 (--pending: PDF 대기만)
 $P search HRV ECG                                               # 제목·초록·요약·본문 검색

@@ -10,7 +10,9 @@
 라이브러리 루트에는 library.json(목록)과 library.bib(BibTeX)를 자동으로 다시 만든다.
 
 사용:
-  python paperlib.py add <DOI | arXiv ID/URL | PDF 경로 | PDF URL> [--no-pdf] [--key <citekey>]
+  python paperlib.py add <DOI | arXiv ID/URL | PDF 경로 | PDF URL | 웹페이지 URL> [--no-pdf] [--key <citekey>]
+  python paperlib.py set <citekey> 필드=값 ...     (보고서 서지 보완: type authors year publisher number url date accessed short title)
+  python paperlib.py rename <citekey> <새 citekey>
   python paperlib.py list [--pending] | search <단어...> | show <citekey>
   python paperlib.py cite <원고.md> [-o 결과.md] [--style apa|ieee] [--table] [--heading 참고문헌]
   python paperlib.py render [citekey]      summary.md → index.html (라이브러리 목록 index.html 포함)
@@ -28,6 +30,7 @@ import shutil
 import sys
 import unicodedata
 import xml.etree.ElementTree as ET
+from html.parser import HTMLParser
 from pathlib import Path
 
 try:
@@ -60,11 +63,13 @@ def from_crossref(doi):
     date = (m.get("issued") or m.get("published") or {}).get("date-parts", [[None]])[0]
     return {
         "title": html.unescape((m.get("title") or [""])[0]),
-        "authors": [{"family": a.get("family", a.get("name", "")), "given": a.get("given", "")} for a in m.get("author", [])],
+        "authors": [{"family": a["family"], "given": a.get("given", "")} if a.get("family") else {"literal": a.get("name", "")}
+                    for a in m.get("author", [])],
         "year": date[0] if date else None,
         "venue": html.unescape((m.get("container-title") or [""])[0]),
         "volume": m.get("volume", ""), "issue": m.get("issue", ""), "pages": m.get("page", ""),
         "doi": m.get("DOI", doi).lower(), "url": m.get("URL", ""), "type": m.get("type", ""),
+        "publisher": m.get("publisher", ""),
         "abstract": html.unescape(abstract), "source": "crossref",
     }
 
@@ -108,7 +113,7 @@ def search_title(title):
 
 
 def norm_title(s):
-    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+    return re.sub(r"[\W_]", "", (s or "").lower())  # 한글 제목도 비교되도록 유니코드 글자는 남김
 
 
 def same_title(a, b):
@@ -176,7 +181,7 @@ def resolve(src):
             except Exception:
                 pass
         meta = meta or {"title": title, "authors": [], "year": None, "venue": "", "doi": "", "url": "",
-                        "abstract": "", "source": "pdf"}
+                        "abstract": "", "source": "pdf", "type": "report"}  # DOI 없는 PDF는 보고서로 가정
         return meta, p
     m = ARXIV_RE.fullmatch(src.strip()) or (ARXIV_RE.search(src) if "arxiv" in src.lower() else None)
     if m:
@@ -195,10 +200,71 @@ def resolve(src):
         meta["pdf_url"] = oa_pdf_url(meta["doi"])
         return meta, None
     if src.lower().startswith("http"):
-        tmp = LIB / "_download.pdf"
-        download(src, tmp)
-        return resolve(str(tmp))
+        r = requests.get(src, headers=UA, timeout=90)
+        r.raise_for_status()
+        if r.content.startswith(b"%PDF"):
+            tmp = LIB / "_download.pdf"
+            tmp.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_bytes(r.content)
+            meta, pdf = resolve(str(tmp))
+            if not meta.get("doi"):  # 웹에서 받은 보고서 PDF: 출처 URL과 접속일 기록
+                meta["url"] = meta.get("url") or src
+                meta["accessed"] = datetime.date.today().isoformat()
+            return meta, pdf
+        return from_web(src, r), None
     raise SystemExit(f"알 수 없는 입력: {src}")
+
+
+class _TextGrab(HTMLParser):
+    SKIP = {"script", "style", "noscript", "nav", "footer", "header", "form", "aside", "svg"}
+    BLOCK = {"p", "div", "br", "li", "h1", "h2", "h3", "h4", "tr", "section", "article", "table"}
+
+    def __init__(self):
+        super().__init__()
+        self.out, self.skip, self.meta, self.title = [], 0, {}, ""
+        self._in_title = False
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag in self.SKIP:
+            self.skip += 1
+        elif tag == "title":
+            self._in_title = True
+        elif tag == "meta" and a.get("content"):
+            self.meta[(a.get("property") or a.get("name") or "").lower()] = a["content"]
+        if tag in self.BLOCK:
+            self.out.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP and self.skip:
+            self.skip -= 1
+        elif tag == "title":
+            self._in_title = False
+        if tag in self.BLOCK:
+            self.out.append("\n")
+
+    def handle_data(self, data):
+        if self._in_title:
+            self.title += data
+        elif not self.skip:
+            self.out.append(data)
+
+
+def from_web(url, resp):
+    """웹페이지(보도자료·정책 페이지 등)의 제목·사이트·날짜와 본문 텍스트."""
+    if resp.encoding in (None, "ISO-8859-1"):
+        resp.encoding = resp.apparent_encoding
+    g = _TextGrab()
+    g.feed(resp.text)
+    mt = g.meta
+    text = "\n".join(l.strip() for l in "".join(g.out).splitlines() if l.strip())
+    date = (mt.get("article:published_time") or mt.get("date") or mt.get("dc.date") or "")[:10]
+    return {"title": html.unescape(mt.get("og:title") or g.title).strip(), "authors": [],
+            "year": int(date[:4]) if date[:4].isdigit() else None, "date": date,
+            "venue": "", "publisher": mt.get("og:site_name", ""), "doi": "", "url": url,
+            "accessed": datetime.date.today().isoformat(), "type": "webpage",
+            "abstract": html.unescape(mt.get("og:description") or mt.get("description") or ""),
+            "source": "web", "_text": text}
 
 
 def download(url, dest):
@@ -216,10 +282,19 @@ def ascii_word(s):
     return re.sub(r"[^A-Za-z0-9]", "", s)
 
 
+def key_word(s, n=12):
+    """한글·한자·가나가 있으면 그대로(기호만 제거), 아니면 ASCII로."""
+    clean = re.sub(r"[\W_]", "", s)
+    if re.search(r"[가-힣\u3040-\u30ff\u4e00-\u9fff]", clean):
+        return clean[:n]
+    return ascii_word(s)[:n]
+
+
 def make_key(meta):
-    fam = ascii_word(meta["authors"][0]["family"]) if meta.get("authors") else ""
-    word = next((ascii_word(w) for w in meta["title"].split() if ascii_word(w).lower() not in STOP and ascii_word(w)), "paper")
-    base = f"{fam or 'Anon'}{meta.get('year') or 'nd'}{word.lower()}"
+    first = (meta.get("authors") or [{}])[0]
+    who = key_word(meta.get("short") or first.get("family") or first.get("literal") or meta.get("publisher") or "", 14)
+    word = next((key_word(w) for w in meta["title"].split() if key_word(w) and key_word(w).lower() not in STOP), "doc")
+    base = f"{who or 'Anon'}{meta.get('year') or 'nd'}{word.lower() if word.isascii() else word}"
     key, n = base, 0
     while (PAPERS / key).exists() and json.loads((PAPERS / key / "meta.json").read_text(encoding="utf-8")).get("doi") != meta.get("doi"):
         n += 1
@@ -240,7 +315,18 @@ def find_existing(meta):
 
 
 # ---------------------------------------------------------------- 본문·그림
-CAP_RE = re.compile(r"^\s*(fig(?:ure)?\.?)\s*(\d+)\s*[:.|   ]", re.I)
+CAP_RE = re.compile(r"^\s*(?:(?:fig(?:ure)?\.?)\s*(\d+)\s*[:.|\u2002\u2003\u2009]"
+                    r"|[<\[〈［]\s*그림\s*(\d+(?:[-.]\d+)?)\s*[>\]〉］]"
+                    r"|그림\s*(\d+(?:[-.]\d+)?)\s*[:.]\s)", re.I)
+
+
+def cap_num(text):
+    m = CAP_RE.match(text)
+    return next((g for g in m.groups() if g), None) if m else None
+
+
+def num_key(n):
+    return tuple(int(x) for x in re.split(r"[-.]", n))
 
 
 def extract_text(doc, out):
@@ -255,14 +341,14 @@ def extract_figures(doc, outdir, zoom=2.5):
     for pno, page in enumerate(doc):
         W, H = page.rect.width, page.rect.height
         blocks = [b for b in page.get_text("blocks") if b[6] == 0]
-        caps = [b for b in blocks if CAP_RE.match(b[4])]
+        caps = [b for b in blocks if cap_num(b[4])]
         if not caps:
             continue
         gfx = [fitz.Rect(i["bbox"]) for i in page.get_image_info()]
         gfx += [d["rect"] for d in page.get_drawings() if d["rect"].width * d["rect"].height < 0.8 * W * H]
         gfx = [g for g in gfx if g.width > 1 or g.height > 1]
         for cb in sorted(caps, key=lambda b: b[1]):
-            num = int(CAP_RE.match(cb[4]).group(2))
+            num = cap_num(cb[4])
             if num in seen:
                 continue
             cap = fitz.Rect(cb[:4])
@@ -291,28 +377,61 @@ def extract_figures(doc, outdir, zoom=2.5):
             pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=box)
             pix.save(outdir / name, jpg_quality=85)
             seen.add(num)
-            figs.append({"id": f"fig{num}", "label": f"Figure {num}", "page": pno + 1,
+            figs.append({"id": f"fig{num}", "label": f"{'그림' if '그림' in cb[4][:6] else 'Figure'} {num}", "page": pno + 1,
                          "caption": " ".join(cb[4].split()), "file": f"figures/{name}"})
-    return sorted(figs, key=lambda f: int(f["id"][3:]))
+    return sorted(figs, key=lambda f: num_key(f["id"][3:]))
+
+
+# ---------------------------------------------------------------- 저자
+def fam(a):
+    """개인 저자는 성, 기관·한글 이름(literal)은 이름 전체."""
+    return a.get("literal") or a.get("family", "")
+
+
+def parse_authors(text):
+    """'과학기술정책연구원; 홍길동' · 'Smith, John; Lee, K.' · 'John Smith' 형식을 저자 목록으로."""
+    out = []
+    for part in [x.strip() for x in re.split(r"[;\n]", text) if x.strip()]:
+        if "," in part:
+            f, g = [x.strip() for x in part.split(",", 1)]
+            out.append({"family": f, "given": g})
+        elif re.search(r"[가-힣]", part) or " " not in part:
+            out.append({"literal": part})  # 기관명·한글 이름은 그대로 표기
+        else:
+            out.append(split_name(part))
+    return out
+
+
+KIND = {"report": "report", "report-component": "report", "report-series": "report",
+        "book": "book", "monograph": "book", "edited-book": "book", "webpage": "web"}
+
+
+def kind(m):
+    return KIND.get(m.get("type", ""), "article")
 
 
 # ---------------------------------------------------------------- 라이브러리 색인
 def bib_entry(m):
     esc = lambda s: str(s).replace("{", "").replace("}", "")
-    kind = "misc" if m.get("type") in ("preprint", "posted-content") else "inproceedings" if "proceedings" in m.get("type", "") else "article"
-    f = {"title": "{" + esc(m["title"]) + "}",
-         "author": " and ".join(f"{a['family']}, {a['given']}".strip(", ") for a in m.get("authors", [])),
-         "year": m.get("year") or "", ("booktitle" if kind == "inproceedings" else "journal"): m.get("venue", ""),
-         "volume": m.get("volume", ""), "number": m.get("issue", ""), "pages": m.get("pages", ""),
-         "doi": m.get("doi", ""), "eprint": m.get("arxiv", ""), "url": m.get("url", "")}
-    body = ",\n".join(f"  {k} = {{{v}}}" for k, v in f.items() if v)
-    return f"@{kind}{{{m['key']},\n{body}\n}}\n"
+    k = kind(m)
+    entry = {"report": "techreport", "book": "book", "web": "misc"}.get(k) or (
+        "misc" if m.get("type") in ("preprint", "posted-content") else "inproceedings" if "proceedings" in m.get("type", "") else "article")
+    au = " and ".join("{" + a["literal"] + "}" if a.get("literal") else f"{a['family']}, {a['given']}".strip(", ")
+                      for a in m.get("authors", []))
+    f = {"title": "{" + esc(m["title"]) + "}", "author": au, "year": m.get("year") or "",
+         ("booktitle" if entry == "inproceedings" else "journal"): m.get("venue", "") if k == "article" else "",
+         "institution" if entry == "techreport" else "publisher": m.get("publisher", "") if k != "article" else "",
+         "volume": m.get("volume", ""), "number": m.get("number") or m.get("issue", ""), "pages": m.get("pages", ""),
+         "doi": m.get("doi", ""), "eprint": m.get("arxiv", ""), "url": m.get("url", ""),
+         "urldate": m.get("accessed", "") if k in ("web", "report") else ""}
+    body = ",\n".join(f"  {k_} = {{{v}}}" for k_, v in f.items() if v)
+    return f"@{entry}{{{m['key']},\n{body}\n}}\n"
 
 
 def rebuild():
     metas = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(PAPERS.glob("*/meta.json"))]
     idx = [{k: m.get(k) for k in ("key", "title", "year", "venue", "doi", "arxiv", "added")} |
-           {"authors": "; ".join(a["family"] for a in m.get("authors", [])),
+           {"authors": "; ".join(fam(a) for a in m.get("authors", [])), "type": kind(m),
             "has_summary": (PAPERS / m["key"] / "summary.md").exists(),
             "has_text": (PAPERS / m["key"] / "text.md").exists(),
             "figures": len(json.loads((PAPERS / m["key"] / "figures.json").read_text(encoding="utf-8")))
@@ -331,7 +450,10 @@ def load_meta(key):
 def cmd_add(a):
     PAPERS.mkdir(parents=True, exist_ok=True)
     note = ""
-    if a.key:  # 서지만 등록된 항목에 PDF를 직접 붙이기
+    if a.key and not load_meta(a.key):  # 새 항목을 원하는 citekey로 (예: STEPI2025혁신)
+        meta, local_pdf = resolve(a.source)
+        key = a.key
+    elif a.key:  # 서지만 등록된 항목에 PDF를 직접 붙이기
         old = load_meta(a.key) or sys.exit(f"없는 citekey: {a.key}")
         src = Path(a.source)
         if not src.exists():
@@ -354,6 +476,9 @@ def cmd_add(a):
     d = PAPERS / key
     d.mkdir(exist_ok=True)
     meta.update(key=key, added=meta.get("added") or datetime.date.today().isoformat())
+    web_text = meta.pop("_text", None)
+    if web_text is not None:  # 웹페이지: 본문 텍스트만 저장
+        (d / "text.md").write_text(f"<!-- source: {meta['url']} (accessed {meta['accessed']}) -->\n{web_text}\n", encoding="utf-8")
     pdf = d / "paper.pdf"
     if local_pdf:
         if Path(local_pdf).resolve() != pdf.resolve():
@@ -366,7 +491,7 @@ def cmd_add(a):
         except Exception as e:
             note = (f"PDF 내려받기 실패({e}) — 서지·초록만 저장. PDF를 받으면 "
                     f"'add <PDF 경로>' 또는 'add <PDF 경로> --key {key}'로 본문·그림 추출")
-    elif not pdf.exists() and not (d / "text.md").exists():
+    elif not pdf.exists() and not (d / "text.md").exists() and web_text is None:
         note = (f"공개 PDF 없음(유료일 수 있음) — 서지·초록만 저장. PDF를 받으면 "
                 f"'add <PDF 경로>' 또는 'add <PDF 경로> --key {key}'로 본문·그림 추출")
     figs = []
@@ -385,7 +510,10 @@ def cmd_add(a):
     print(json.dumps({"key": key, "dir": str(d), "title": meta["title"], "year": meta.get("year"),
                       "venue": meta.get("venue"), "doi": meta.get("doi"), "text": (d / "text.md").exists(),
                       "figures": [f"{f['label']} (p.{f['page']})" for f in figs], "size_kb": size // 1024,
-                      "note": note}, ensure_ascii=False, indent=1))
+                      "type": kind(meta), "publisher": meta.get("publisher"), "authors": [fam(x) for x in meta.get("authors", [])],
+                      "note": note or ("서지가 빈약함 — 표지·판권면을 읽고 'set'으로 기관·연도·보고서 번호를 채울 것"
+                                       if kind(meta) in ("report", "web") and not (meta.get("authors") and meta.get("year")) else "")},
+                     ensure_ascii=False, indent=1))
 
 
 def cmd_list(a):
@@ -419,13 +547,63 @@ def cmd_show(a):
     print("files:", ", ".join(str(p.relative_to(d)) for p in sorted(d.rglob("*")) if p.is_file()))
 
 
+FIELDS = {"type", "title", "authors", "year", "publisher", "number", "url", "date", "accessed", "short", "venue",
+          "volume", "issue", "pages", "doi", "abstract", "lang"}
+
+
+def cmd_set(a):
+    m = load_meta(a.key) or sys.exit(f"없는 citekey: {a.key}")
+    for kv in a.pairs:
+        k, _, v = kv.partition("=")
+        if k not in FIELDS:
+            sys.exit(f"알 수 없는 필드: {k} (가능: {', '.join(sorted(FIELDS))})")
+        m[k] = parse_authors(v) if k == "authors" else int(v) if k == "year" and v.isdigit() else v
+    (PAPERS / a.key / "meta.json").write_text(json.dumps(m, ensure_ascii=False, indent=1), encoding="utf-8")
+    rebuild()
+    print(json.dumps({"key": a.key, "type": kind(m), "authors": [fam(x) for x in m.get("authors", [])],
+                      "year": m.get("year"), "title": m["title"], "publisher": m.get("publisher"),
+                      "number": m.get("number"), "url": m.get("url"), "apa": ref_apa(m)}, ensure_ascii=False, indent=1))
+
+
+def cmd_rename(a):
+    m = load_meta(a.old) or sys.exit(f"없는 citekey: {a.old}")
+    if (PAPERS / a.new).exists():
+        sys.exit(f"이미 있는 citekey: {a.new}")
+    shutil.move(str(PAPERS / a.old), str(PAPERS / a.new))
+    m["key"] = a.new
+    (PAPERS / a.new / "meta.json").write_text(json.dumps(m, ensure_ascii=False, indent=1), encoding="utf-8")
+    sm = PAPERS / a.new / "summary.md"
+    if sm.exists():
+        sm.write_text(sm.read_text(encoding="utf-8").replace(f"@{a.old}", f"@{a.new}"), encoding="utf-8")
+    rebuild()
+    print(f"{a.old} → {a.new} (요약 노트의 인용 키도 변경. 다른 원고에 쓴 [@{a.old}]는 직접 바꿔야 함)")
+
+
 # ---------------------------------------------------------------- 인용
 CITE_RE = re.compile(r"\[(@[^\[\]]+)\]")
 
 
 def names_short(m):
-    fam = [a["family"] for a in m.get("authors", [])]
-    return fam[0] if len(fam) == 1 else f"{fam[0]} & {fam[1]}" if len(fam) == 2 else f"{fam[0]} et al." if fam else m["title"][:30]
+    fs = [fam(a) for a in m.get("authors", [])]
+    if not fs:
+        return m.get("publisher") or m["title"][:30]
+    return fs[0] if len(fs) == 1 else f"{fs[0]} & {fs[1]}" if len(fs) == 2 else f"{fs[0]} et al."
+
+
+MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+          "November", "December"]
+
+
+def fmt_date(d, style):
+    """'2025-12-03' → APA '2025, December 3' / IEEE 'Dec. 3, 2025'. 형식이 다르면 그대로."""
+    parts = str(d or "").split("-")
+    if len(parts) != 3 or not all(x.isdigit() for x in parts):
+        return d
+    y, mo, dd = int(parts[0]), MONTHS[int(parts[1]) - 1], int(parts[2])
+    if style == "apa":
+        return f"{y}, {mo} {dd}"
+    short = mo if len(mo) <= 4 else mo[:3] + "."
+    return f"{short} {dd}, {y}"
 
 
 def initials(given):
@@ -433,22 +611,40 @@ def initials(given):
 
 
 def ref_apa(m):
-    au = [f"{a['family']}, {initials(a['given'])}".strip(", ") for a in m.get("authors", [])]
+    au = [a["literal"] if a.get("literal") else f"{a['family']}, {initials(a['given'])}".strip(", ") for a in m.get("authors", [])]
     if len(au) > 20:
         au_s = ", ".join(au[:19]) + ", ... " + au[-1]
     else:
         au_s = au[0] if len(au) == 1 else ", ".join(au[:-1]) + ", & " + au[-1] if au else ""
+    k = kind(m)
+    link = f"https://doi.org/{m['doi']}" if m.get("doi") else m.get("url", "")
+    if k != "article":  # 보고서·단행본·웹페이지: 제목 기울임, 발행처
+        if not au_s:
+            au_s = m.get("publisher", "")
+        when = fmt_date(m["date"], "apa") if k == "web" and m.get("date") else (m.get("year") or "n.d.")
+        lead = au_s if au_s.endswith(".") else f"{au_s}."
+        out = f"{lead} ({when}). *{m['title']}*"
+        if m.get("number"):
+            out += f" ({m['number']})"
+        out += "."
+        if m.get("publisher") and m["publisher"] != au_s.rstrip("."):
+            out += f" {m['publisher']}."
+        if k == "web" and not m.get("date") and not m.get("year") and m.get("accessed"):
+            y, _, md = fmt_date(m["accessed"], "apa").partition(", ")
+            return f"{out} Retrieved {md + ', ' + y if md else y}, from {link}"
+        return f"{out} {link}".strip()
     src = f"*{m['venue']}*" if m.get("venue") else ""
     if m.get("volume"):
         src += f", *{m['volume']}*" + (f"({m['issue']})" if m.get("issue") else "")
     if m.get("pages"):
         src += f", {m['pages']}"
     link = f"https://doi.org/{m['doi']}" if m.get("doi") else m.get("url", "")
-    return f"{au_s} ({m.get('year') or 'n.d.'}). {m['title']}. {src}. {link}".replace(" . ", " ").replace("..", ".")
+    lead = au_s if au_s.endswith(".") else f"{au_s}."
+    return f"{lead} ({m.get('year') or 'n.d.'}). {m['title']}. {src}. {link}".replace(" . ", " ").replace("..", ".")
 
 
 def ref_ieee(m):
-    au = [f"{initials(a['given'])} {a['family']}".strip() for a in m.get("authors", [])]
+    au = [a["literal"] if a.get("literal") else f"{initials(a['given'])} {a['family']}".strip() for a in m.get("authors", [])]
     if not au:
         au_s = ""
     elif len(au) == 1:
@@ -459,6 +655,19 @@ def ref_ieee(m):
         au_s = ", ".join(au[:-1]) + ", and " + au[-1]
     else:
         au_s = au[0] + " et al."
+    k = kind(m)
+    if k != "article":
+        who = au_s or m.get("publisher", "")
+        url = f" [Online]. Available: {m['url']}" if m.get("url") and not m.get("doi") else ""
+        if k == "web":
+            site = ", ".join(x for x in (m.get("publisher") if m.get("publisher") != who else "",
+                                         fmt_date(m.get("date"), "ieee")) if x) or str(m.get("year") or "n.d.")
+            acc = f" Accessed: {fmt_date(m['accessed'], 'ieee')}." if m.get("accessed") else ""
+            return f"{who + ', ' if who else ''}“{m['title']},” {site.rstrip('.')}.{acc}{url}"
+        rep = f"Rep. {m['number']}, " if m.get("number") else ""
+        pub = f"{m['publisher']}, " if m.get("publisher") and m["publisher"] != who else ""
+        doi = f", doi: {m['doi']}." if m.get("doi") else "."
+        return f"{who}, “{m['title']},” {pub}{rep}{m.get('year') or 'n.d.'}{doi}{url}"
     vol = f", vol. {m['volume']}" if m.get("volume") else ""
     no = f", no. {m['issue']}" if m.get("issue") else ""
     pp = (f", pp. {m['pages']}" if "-" in str(m["pages"]) else f", Art. no. {m['pages']}") if m.get("pages") else ""
@@ -510,9 +719,10 @@ def cmd_cite(a):
     fmt = ref_ieee if a.style == "ieee" else ref_apa
     out = [body.rstrip(), "", f"## {a.heading}", ""]
     if a.table:  # hwpx 스킬용 표
-        out += ["<!-- widths: 8,17,37,38 -->", "| 번호 | 저자(연도) | 논문·출처 | DOI |", "|---|---|---|---|"]
+        out += ["<!-- widths: 8,17,37,38 -->", "| 번호 | 저자(연도) | 논문·출처 | DOI·URL |", "|---|---|---|---|"]
         out += [f"| {i} | {names_short(metas[k]).replace(' et al.', ' 외')} ({metas[k].get('year') or 'n.d.'}) | "
-                f"{metas[k]['title']}, {metas[k].get('venue', '')} | {metas[k].get('doi') or metas[k].get('url', '')} |"
+                f"{metas[k]['title']}, {metas[k].get('venue') or metas[k].get('publisher', '')}"
+                f"{' (' + metas[k]['number'] + ')' if metas[k].get('number') else ''} | {metas[k].get('doi') or metas[k].get('url', '')} |"
                 for i, k in enumerate(keys, 1)]
     else:
         out += [f"{f'[{i}] ' if a.style == 'ieee' else ''}{fmt(metas[k])}" + ("" if a.style == "ieee" else "") for i, k in enumerate(keys, 1)]
@@ -541,7 +751,7 @@ def render_one(key):
     d, m = PAPERS / key, load_meta(key)
     src = (d / "summary.md").read_text(encoding="utf-8") if (d / "summary.md").exists() else "_요약 노트 없음_"
     src = CITE_RE.sub(lambda mt: f"<span class='cite'>{html.escape(mt.group(1))}</span>", src)
-    au = ", ".join(f"{a['given']} {a['family']}".strip() for a in m.get("authors", []))
+    au = ", ".join(a.get("literal") or f"{a['given']} {a['family']}".strip() for a in m.get("authors", [])) or m.get("publisher", "")
     link = f"https://doi.org/{m['doi']}" if m.get("doi") else m.get("url", "")
     head = (f"<p><a href='../../index.html'>← 라이브러리</a></p><h1>{html.escape(m['title'])}</h1>"
             f"<div class='meta'><b>{html.escape(au)}</b><br>{html.escape(str(m.get('venue', '')))} ({m.get('year') or 'n.d.'})"
@@ -567,7 +777,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sp = ap.add_subparsers(dest="cmd", required=True)
     p = sp.add_parser("add"); p.add_argument("source"); p.add_argument("--no-pdf", action="store_true")
-    p.add_argument("--key", help="이미 등록된 citekey에 이 PDF를 붙임"); p.set_defaults(f=cmd_add)
+    p.add_argument("--key", help="이미 있는 citekey면 이 PDF를 붙이고, 없으면 새 항목을 이 citekey로 만듦"); p.set_defaults(f=cmd_add)
+    p = sp.add_parser("set"); p.add_argument("key"); p.add_argument("pairs", nargs="+", metavar="필드=값"); p.set_defaults(f=cmd_set)
+    p = sp.add_parser("rename"); p.add_argument("old"); p.add_argument("new"); p.set_defaults(f=cmd_rename)
     p = sp.add_parser("list"); p.add_argument("--pending", action="store_true", help="PDF 대기(본문 없음)만"); p.set_defaults(f=cmd_list)
     p = sp.add_parser("search"); p.add_argument("terms", nargs="+"); p.set_defaults(f=cmd_search)
     p = sp.add_parser("show"); p.add_argument("key"); p.set_defaults(f=cmd_show)
